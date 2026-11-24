@@ -1,0 +1,13 @@
+.DS_Store
+.local/
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+coverage/
+*.tsbuildinfo
+._*
+

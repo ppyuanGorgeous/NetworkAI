@@ -1,0 +1,74 @@
+name: networkai
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.29
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      xpack.license.self_generated.type: basic
+      ELASTIC_PASSWORD: ${ES_PASSWORD:?Run python3 scripts/configure-local.py first}
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - search-data:/usr/share/elasticsearch/data
+    mem_limit: 1g
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS --user "elastic:$${ELASTIC_PASSWORD}" "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null']
+      interval: 10s
+      timeout: 8s
+      retries: 24
+      start_period: 30s
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      PORT: "8080"
+      ES_URL: http://elasticsearch:9200
+      ES_USERNAME: elastic
+      ES_PASSWORD: ${ES_PASSWORD:?Run python3 scripts/configure-local.py first}
+      JWT_SECRET: ${JWT_SECRET:?Run python3 scripts/configure-local.py first}
+      MEDIA_STORAGE: local
+      MEDIA_LOCAL_DIR: /data/media
+      MEDIA_PUBLIC_BASE_URL: /api/backend/media
+    volumes:
+      - media-data:/data/media
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/healthz]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      INTERNAL_API_URL: http://backend:8080
+      ENABLE_PAID_AI: ${ENABLE_PAID_AI:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-2}
+      OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-gpt-4.1-mini}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/backend/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  search-data:
+  media-data:
