@@ -1,0 +1,10 @@
+.git
+.local
+.env*
+*.key
+*.pem
+._*
+postman
+LESSON*.md
+conf
+app.yaml
