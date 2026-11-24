@@ -1,0 +1,8 @@
+.git
+.openai
+node_modules
+.next
+.env*
+coverage
+*.tsbuildinfo
+._*
